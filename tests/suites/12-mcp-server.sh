@@ -191,4 +191,8 @@ else
     _fail "security_validate.py: all pattern tests pass" "$sv_test"
 fi
 
+# Installers copy mcp-server/ as-is, so the checks above must not leave bytecode there
+assert_eq "no bytecode written into the MCP server source" "" \
+    "$(find "${ROOT_DIR}/adapters/_shared/mcp-server" -name '__pycache__')"
+
 suite_end
