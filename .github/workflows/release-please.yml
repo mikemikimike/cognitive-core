@@ -8,6 +8,9 @@
 #   - release-please-config.json in repo root
 #   - .release-please-manifest.json in repo root
 #   - version.txt as source of truth (for release-type: simple)
+#   - Optional GitHub App (secrets REVIEWER_APP_ID, REVIEWER_APP_PRIVATE_KEY)
+#     with Contents, Pull requests and Issues read/write on this repo, so the
+#     release PR runs CI and a published release triggers `release` workflows
 #
 # Customize:
 #   - target-branch: your default branch (main, master, develop, development)
@@ -37,6 +40,7 @@ jobs:
       - name: App token
         id: app
         if: env.HAS_APP == 'true'
+        continue-on-error: true  # an unusable App falls back to GITHUB_TOKEN
         uses: actions/create-github-app-token@v3
         with:
           client-id: ${{ secrets.REVIEWER_APP_ID }}  # the App ID works as client-id
