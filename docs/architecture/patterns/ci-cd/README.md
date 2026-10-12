@@ -191,8 +191,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - run: pip install ruff
@@ -207,8 +207,8 @@ jobs:
         env:
           POSTGRES_PASSWORD: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
       - run: pip install -e .[test]
       - run: pytest --cov=src --cov-report=xml
 
@@ -218,7 +218,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: ./deploy.sh staging
 
   deploy-production:
@@ -227,7 +227,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: ./deploy.sh production
 ```
 

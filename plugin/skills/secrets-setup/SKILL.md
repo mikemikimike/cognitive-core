@@ -138,7 +138,7 @@ Patch existing GitHub Actions workflows to support 1Password secrets:
    ```yaml
    - name: Load secrets from 1Password
      if: ${{ env.OP_SERVICE_ACCOUNT_TOKEN != '' }}
-     uses: 1password/load-secrets-action@v2
+     uses: 1password/load-secrets-action@v4
      with:
        export-env: true
      env:

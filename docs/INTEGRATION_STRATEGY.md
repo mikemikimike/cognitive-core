@@ -385,7 +385,7 @@ jobs:
       image: project-test-image:latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Selection Phase
       - name: Lint Gate (threshold: 0.60)

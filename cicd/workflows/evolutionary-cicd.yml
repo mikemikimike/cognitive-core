@@ -46,7 +46,7 @@ jobs:
       changed_files: ${{ steps.diff.outputs.files }}
       file_count: ${{ steps.diff.outputs.count }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -148,7 +148,7 @@ jobs:
 
       - name: Upload lint logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: lint-logs
           path: logs/
@@ -162,7 +162,7 @@ jobs:
     needs: gate-1-lint
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Fix workspace permissions (Finding #2)
@@ -213,7 +213,7 @@ jobs:
       test_pass_rate: ${{ steps.results.outputs.pass_rate }}
       fitness_score: ${{ steps.fitness.outputs.score }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Fix workspace permissions (Finding #2)
         if: ${{ vars.RUNNER_LABEL != '' && vars.RUNNER_LABEL != 'ubuntu-latest' }}
         run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" || true
@@ -243,9 +243,11 @@ jobs:
 
       - name: Setup Node.js (CC1)
         if: steps.pkgmgr.outputs.manager != ''
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ steps.pkgmgr.outputs.node_version }}
+          # keep v4 behaviour: no auto-cache (pnpm is installed after this step)
+          package-manager-cache: false
 
       - name: Install dependencies (CC1)
         if: steps.pkgmgr.outputs.manager != ''
@@ -331,14 +333,14 @@ jobs:
           echo "score=0" >> "$GITHUB_OUTPUT"
           echo "::notice::No fitness-check.sh found"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: test-results
           path: test-results/
           retention-days: 14
 
-      - uses: mikepenz/action-junit-report@v4
+      - uses: mikepenz/action-junit-report@v6
         if: always()
         continue-on-error: true
         with:
@@ -388,7 +390,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Fix workspace permissions (Finding #2)
         if: ${{ vars.RUNNER_LABEL != '' && vars.RUNNER_LABEL != 'ubuntu-latest' }}
         run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" || true
@@ -400,13 +402,15 @@ jobs:
             { echo "::error::Fitness $FIT < deploy threshold ${{ env.GATE_DEPLOY_FITNESS_THRESHOLD }}"; exit 1; }
           true
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ${{ vars.CONTAINER_REGISTRY || 'ghcr.io' }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false  # v6+ default uploads a build-record artifact
         with:
           context: .
           push: true
