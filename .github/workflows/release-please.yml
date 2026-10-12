@@ -23,32 +23,28 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: write       # start CI on the release PR
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    env:
+      # secrets are not usable in `if`, so expose presence as a job-level flag
+      HAS_APP: ${{ secrets.REVIEWER_APP_ID != '' }}
     steps:
-      - id: release
-        uses: googleapis/release-please-action@v5
+      # Events from GITHUB_TOKEN start no workflows: a release PR opened with it
+      # gets no CI and a release triggers no `release` workflows. A GitHub App
+      # token avoids both; without the App secrets GITHUB_TOKEN is used as before.
+      - name: App token
+        id: app
+        if: env.HAS_APP == 'true'
+        uses: actions/create-github-app-token@v3
         with:
+          client-id: ${{ secrets.REVIEWER_APP_ID }}  # the App ID works as client-id
+          private-key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}
+
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ steps.app.outputs.token || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: main    # Change to your default branch
-
-      # A release PR opened or updated with GITHUB_TOKEN triggers no workflows,
-      # so start CI on its branch; the checks land on the PR head commit.
-      # Not fatal: projects without a dispatchable CI workflow keep releasing.
-      - name: Run CI on the release PR
-        if: steps.release.outputs.prs_created == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_JSON: ${{ steps.release.outputs.pr }}
-          CI_WORKFLOW: ci.yml  # Change to your CI workflow file
-        run: |
-          branch=$(printf '%s' "$PR_JSON" | jq -r '.headBranchName // empty')
-          if [ -z "$branch" ]; then
-            echo "::warning::release PR branch unknown, CI not started"
-          elif ! gh workflow run "$CI_WORKFLOW" --repo "$GITHUB_REPOSITORY" --ref "$branch"; then
-            echo "::warning::could not start ${CI_WORKFLOW} on ${branch}"
-          fi
