@@ -11,6 +11,11 @@ _TEST_SUITE=""
 _JUNIT_CASES=""
 _JUNIT_DIR="${JUNIT_REPORT_DIR:-}"
 
+# ---- Python bytecode ----
+# Keep .pyc out of the source tree: installers copy mcp-server/ as-is, so a
+# __pycache__ written by one suite would leak into the snapshot of suite 21.
+export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-${TMPDIR:-/tmp}/cc-test-pycache-$(id -u)}"
+
 # ---- Colors ----
 _GREEN='\033[0;32m'
 _RED='\033[0;31m'
