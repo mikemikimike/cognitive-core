@@ -57,7 +57,7 @@ The pipeline reads configuration from GitHub repository variables (Settings > Se
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RUNNER_LABEL` | `ubuntu-latest` | Runner label (set to your self-hosted label for self-hosted runners) |
+| `RUNNER_LABEL` | `ubuntu-latest` | Runner label (set to your self-hosted label for self-hosted runners; needs runner >= 2.327.1 for the Node 24 actions) |
 | `GATE_TEST_MIN_PASS_RATE` | `95` | Minimum test pass rate percentage |
 | `GATE_MERGE_FITNESS_THRESHOLD` | `70` | Minimum fitness score for merge gate |
 | `GATE_DEPLOY_FITNESS_THRESHOLD` | `80` | Minimum fitness score for deploy gate |

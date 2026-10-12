@@ -20,7 +20,7 @@ jobs:
       # Falls back to individual GitHub secrets if not configured
       - name: Load secrets from 1Password
         if: env.HAS_OP_TOKEN == 'true'
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@v4
         with:
           export-env: true
         env:

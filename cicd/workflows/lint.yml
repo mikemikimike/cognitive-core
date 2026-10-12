@@ -69,7 +69,7 @@ jobs:
       has_docker: ${{ steps.changes.outputs.has_docker }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0  # Full history for accurate diff
 
@@ -146,7 +146,7 @@ jobs:
     if: needs.detect-changes.outputs.has_perl == 'true'
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Perl
         uses: shogo82148/actions-setup-perl@v1
@@ -187,12 +187,14 @@ jobs:
     if: needs.detect-changes.outputs.has_js == 'true'
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          # keep v4 behaviour: no automatic package-manager cache
+          package-manager-cache: false
 
       - name: Install dependencies
         run: |
@@ -221,10 +223,10 @@ jobs:
     if: needs.detect-changes.outputs.has_python == 'true'
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -249,7 +251,7 @@ jobs:
     if: needs.detect-changes.outputs.has_shell == 'true'
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run shellcheck on changed files
         run: |
@@ -271,7 +273,7 @@ jobs:
     if: needs.detect-changes.outputs.has_yaml == 'true'
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install yamllint
         run: pip install yamllint
@@ -294,7 +296,7 @@ jobs:
     if: needs.detect-changes.outputs.has_docker == 'true'
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run hadolint on changed Dockerfiles
         uses: hadolint/hadolint-action@v3.1.0

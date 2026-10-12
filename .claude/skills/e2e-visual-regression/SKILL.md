@@ -216,7 +216,7 @@ await expect(page).toHaveScreenshot('page.png', {
 
 - name: Upload test artifacts on failure
   if: failure()
-  uses: actions/upload-artifact@v4
+  uses: actions/upload-artifact@v6
   with:
     name: visual-regression-report
     path: lts-portal/test-results/
