@@ -13,7 +13,7 @@ d0cf4e70f3af78788d17385b8b75aaca	./.cognitive-core/hooks/_lib.sh
 0dbebce8e0a71ae4272beae07d4dead4	./.cognitive-core/hooks/setup-env.sh
 3e61a67ccf38b1c9e206cf38ce14487b	./.cognitive-core/hooks/validate-bash.sh
 6fc129bd500c4592b008a31178751125	./.cognitive-core/lint-config.sh
-8219528ac0f37f860ef682666dbefdfd	./.cognitive-core/mcp-config.json
+2a195931dc68c5643bf526eb65cdc53f	./.cognitive-core/mcp-config.json
 48f743766d39f29c79f9081d13dcd430	./.cognitive-core/mcp-server/TOOLS.md
 25b47c46e5a125e130d6b15abcd688c8	./.cognitive-core/mcp-server/requirements.txt
 b9236e4f220c71fb3016debbaf126663	./.cognitive-core/mcp-server/server.py
