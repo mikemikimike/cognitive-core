@@ -23,13 +23,32 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write       # start CI on the release PR
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v5
+      - id: release
+        uses: googleapis/release-please-action@v5
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: main    # Change to your default branch
+
+      # A release PR opened or updated with GITHUB_TOKEN triggers no workflows,
+      # so start CI on its branch; the checks land on the PR head commit.
+      # Not fatal: projects without a dispatchable CI workflow keep releasing.
+      - name: Run CI on the release PR
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_JSON: ${{ steps.release.outputs.pr }}
+          CI_WORKFLOW: ci.yml  # Change to your CI workflow file
+        run: |
+          branch=$(printf '%s' "$PR_JSON" | jq -r '.headBranchName // empty')
+          if [ -z "$branch" ]; then
+            echo "::warning::release PR branch unknown, CI not started"
+          elif ! gh workflow run "$CI_WORKFLOW" --repo "$GITHUB_REPOSITORY" --ref "$branch"; then
+            echo "::warning::could not start ${CI_WORKFLOW} on ${branch}"
+          fi
