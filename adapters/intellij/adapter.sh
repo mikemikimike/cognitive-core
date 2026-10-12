@@ -163,10 +163,7 @@ _adapter_post_install() {
     local generate_py="${SCRIPT_DIR}/adapters/intellij/generate.py"
 
     # Install MCP server files
-    local mcp_src="${SCRIPT_DIR}/adapters/intellij/mcp-server"
-    local mcp_dst="${CC_INSTALL_DIR}/mcp-server"
-    if [ -d "$mcp_src" ]; then
-        cp -R "${mcp_src}/"* "${mcp_dst}/" 2>/dev/null || true
+    if _adapter_install_mcp_server "${CC_INSTALL_DIR}/mcp-server"; then
         info "Installed MCP server to .cognitive-core/mcp-server/"
     fi
 

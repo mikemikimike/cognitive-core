@@ -154,14 +154,7 @@ _adapter_post_install() {
     local generate_py="${SCRIPT_DIR}/adapters/vscode/generate.py"
 
     # Install shared MCP server files
-    local mcp_src="${SCRIPT_DIR}/adapters/_shared/mcp-server"
-    local mcp_dst="${CC_INSTALL_DIR}/mcp-server"
-    if [ -d "$mcp_src" ]; then
-        mkdir -p "${mcp_dst}/tools"
-        cp "$mcp_src/server.py" "${mcp_dst}/"
-        cp "$mcp_src/requirements.txt" "${mcp_dst}/" 2>/dev/null || true
-        cp "$mcp_src/TOOLS.md" "${mcp_dst}/" 2>/dev/null || true
-        cp "$mcp_src/tools/"*.py "${mcp_dst}/tools/" 2>/dev/null || true
+    if _adapter_install_mcp_server "${CC_INSTALL_DIR}/mcp-server"; then
         info "Installed MCP server to .cognitive-core/mcp-server/"
     fi
 

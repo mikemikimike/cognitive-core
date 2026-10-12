@@ -116,6 +116,22 @@ _adapter_common_safety_rules() {
     done < "$rules_file"
 }
 
+# ---- Shared MCP server: copy source files only, never __pycache__ ----
+# Returns 1 when the framework has no MCP server, 2 when the copy fails.
+
+_adapter_install_mcp_server() {
+    local src="${SCRIPT_DIR}/adapters/_shared/mcp-server"
+    local dst="$1"
+    [ -d "$src" ] || return 1
+    if ! mkdir -p "${dst}/tools" || ! cp "$src/server.py" "${dst}/"; then
+        warn "MCP server not installed: copy to ${dst} failed"
+        return 2
+    fi
+    cp "$src/requirements.txt" "${dst}/" 2>/dev/null || true
+    cp "$src/TOOLS.md" "${dst}/" 2>/dev/null || true
+    cp "$src/tools/"*.py "${dst}/tools/" 2>/dev/null || true
+}
+
 
 # ---- Contract validation ----
 

@@ -89,6 +89,50 @@ for fn in _adapter_hook_is_wired _adapter_post_prune; do
     assert_contains "adapter lib: default ${fn}" "$adapter_lib" "${fn}() {"
 done
 
+# ---- Test MCP server install ships source files only (#398) ----
+# Fixture framework: the real MCP server plus planted bytecode
+mcp_root=$(create_test_dir)
+mcp_src="${mcp_root}/fw/adapters/_shared/mcp-server"
+mkdir -p "${mcp_root}/fw/adapters/_shared"
+cp -R "${ROOT_DIR}/adapters/_shared/mcp-server" "$mcp_src"
+mkdir -p "${mcp_src}/__pycache__" "${mcp_src}/tools/__pycache__"
+touch "${mcp_src}/__pycache__/server.cpython-314.pyc" "${mcp_src}/tools/__pycache__/utils.cpython-314.pyc"
+mcp_expected=$(cd "$mcp_src" && find . -type f ! -path '*/__pycache__/*' | sort)
+
+# Each adapter's real post-install (generate.py is absent from the fixture, so it is skipped)
+for adapter in claude vscode intellij; do
+    proj="${mcp_root}/proj-${adapter}"
+    mkdir -p "$proj"
+    bash -c "
+        info() { :; }; warn() { :; }
+        SCRIPT_DIR='${mcp_root}/fw'; CC_INSTALL_DIR='${proj}/.cognitive-core'
+        source '${ROOT_DIR}/adapters/_adapter-lib.sh'
+        source '${ROOT_DIR}/adapters/${adapter}/adapter.sh'
+        _adapter_post_install '${proj}'
+    " >/dev/null 2>&1 || true
+    assert_eq "mcp install (${adapter}): every source file, no bytecode" \
+        "$mcp_expected" "$(cd "${proj}/.cognitive-core/mcp-server" 2>/dev/null && find . -type f | sort)"
+done
+
+mcp_lib() {
+    mcp_rc=0
+    mcp_out=$(bash -c "
+        warn() { printf '%s\\n' \"\$*\"; }
+        SCRIPT_DIR='$1'
+        source '${ROOT_DIR}/adapters/_adapter-lib.sh'
+        _adapter_install_mcp_server '$2'
+    " 2>&1) || mcp_rc=$?
+}
+mcp_lib "${mcp_root}/none" "${mcp_root}/out-none"
+assert_eq "mcp install: no MCP server in framework returns 1" "1" "$mcp_rc"
+assert_eq "mcp install: no MCP server in framework creates nothing" "" "$(find "$mcp_root" -maxdepth 1 -name out-none)"
+
+touch "${mcp_root}/blocker"
+mcp_lib "${mcp_root}/fw" "${mcp_root}/blocker/mcp-server"
+assert_eq "mcp install: failed copy returns 2" "2" "$mcp_rc"
+assert_contains "mcp install: failed copy warns" "$mcp_out" "MCP server not installed"
+rm -rf "$mcp_root"
+
 # ---- Test install with claude adapter produces same structure ----
 test_dir=$(create_test_dir)
 git -C "$test_dir" init --quiet 2>/dev/null

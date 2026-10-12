@@ -206,14 +206,7 @@ _adapter_post_install() {
     local project_dir="$1"
 
     # Install shared MCP server if available
-    local shared_mcp="${SCRIPT_DIR}/adapters/_shared/mcp-server"
-    if [ -d "$shared_mcp" ]; then
-        local target_mcp="${project_dir}/.cognitive-core/mcp-server"
-        mkdir -p "$target_mcp/tools"
-        cp "$shared_mcp/server.py" "$target_mcp/"
-        cp "$shared_mcp/requirements.txt" "$target_mcp/" 2>/dev/null || true
-        cp "$shared_mcp/TOOLS.md" "$target_mcp/" 2>/dev/null || true
-        cp "$shared_mcp/tools/"*.py "$target_mcp/tools/" 2>/dev/null || true
+    if _adapter_install_mcp_server "${project_dir}/.cognitive-core/mcp-server"; then
         info "Installed cognitive-core MCP server."
     fi
 
