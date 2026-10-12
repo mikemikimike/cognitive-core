@@ -188,6 +188,20 @@ jobs:
           path: test-results/
           retention-days: 7
 
+  full-suite:
+    name: Full Test Suite
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run all suites
+        run: bash tests/run-all.sh
+
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -228,7 +242,7 @@ jobs:
 
   summary:
     name: CI Summary
-    needs: [shellcheck, frontmatter, hook-protocol, security-hooks, agent-permissions, install-integration, security-scan]
+    needs: [shellcheck, frontmatter, hook-protocol, security-hooks, agent-permissions, install-integration, full-suite, security-scan]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -246,6 +260,7 @@ jobs:
           echo "| Security Hooks | ${{ needs.security-hooks.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Agent Permissions | ${{ needs.agent-permissions.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Install Integration | ${{ needs.install-integration.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Full Test Suite | ${{ needs.full-suite.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Security Scan | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if any job failed
