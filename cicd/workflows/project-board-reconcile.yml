@@ -34,7 +34,7 @@ jobs:
         if: env.HAS_APP == 'true'
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.REVIEWER_APP_ID }}
+          client-id: ${{ secrets.REVIEWER_APP_ID }}  # v3 accepts the App ID here; no new secret
           private-key: ${{ secrets.REVIEWER_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
       - name: Checkout board script and conf (default branch)
