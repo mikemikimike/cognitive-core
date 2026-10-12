@@ -60,17 +60,20 @@ while IFS= read -r ref; do
     [ -n "$ref" ] || continue
     num="${ref##*#}"
     prefix="${ref%#*}"
+    # Bare #N names no repo: suggest this project, the model checks ownership.
     case "$prefix" in
-        "" | "$REPO_NAME")
+        "")
             if [ -n "$REPO" ]; then
-                link="[${ref}](https://github.com/${REPO}/issues/${num})"
+                link="[${REPO}#${num}](https://github.com/${REPO}/issues/${num})  (if #${num} belongs to another repo, use that owner/repo instead)"
             else
-                link="[${ref}](https://github.com/<owner>/<repo>/issues/${num})  (set CC_GITHUB_REPO)"
+                link="[<owner>/<repo>#${num}](https://github.com/<owner>/<repo>/issues/${num})  (set CC_GITHUB_REPO)"
             fi ;;
+        "$REPO_NAME")
+            link="[${REPO}#${num}](https://github.com/${REPO}/issues/${num})" ;;
         */*)
             link="[${ref}](https://github.com/${prefix}/issues/${num})" ;;
         *)
-            link="[${ref}](https://github.com/<owner>/${prefix}/issues/${num})  (other repo: use its full URL)" ;;
+            link="[<owner>/${prefix}#${num}](https://github.com/<owner>/${prefix}/issues/${num})  (other repo: fill in its owner)" ;;
     esac
     LINES="${LINES}
 - ${ref} -> ${link}"
@@ -78,6 +81,6 @@ done <<EOF
 $REFS
 EOF
 
-REASON="Your reply contains bare GitHub issue/PR references. Post the reply again, unchanged otherwise, with EVERY occurrence written as a Markdown link (/issues/N also opens PRs):${LINES}"
+REASON="Your reply contains bare GitHub issue/PR references. Post the reply again, unchanged otherwise, with EVERY occurrence written as a fully qualified Markdown link [owner/repo#N](url) to the repo the issue belongs to (/issues/N also opens PRs):${LINES}"
 
 jq -n --arg r "$REASON" '{decision: "block", reason: $r}'

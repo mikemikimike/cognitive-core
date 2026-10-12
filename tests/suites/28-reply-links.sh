@@ -34,8 +34,9 @@ run_stop() {
 # ---- blocks ----
 out=$(run_stop 'Merge #302, then #274 (blocked by #196).')
 assert_json_field "bare refs: decision block" "$out" ".decision" "block"
-assert_contains "bare ref gets the project link" "$out" "[#302](https://github.com/acme/widgets/issues/302)"
-assert_contains "ref in parentheses is caught" "$out" "[#196](https://github.com/acme/widgets/issues/196)"
+assert_contains "bare ref gets the qualified project link" "$out" "[acme/widgets#302](https://github.com/acme/widgets/issues/302)"
+assert_contains "bare ref: other repo hint" "$out" "if #302 belongs to another repo, use that owner/repo instead"
+assert_contains "ref in parentheses is caught" "$out" "[acme/widgets#196](https://github.com/acme/widgets/issues/196)"
 
 out=$(run_stop 'Done.
 #42')
@@ -45,17 +46,23 @@ out=$(run_stop 'Fixed in wolaschka/TIMS#485.')
 assert_contains "owner/repo#N gets a direct link" "$out" "[wolaschka/TIMS#485](https://github.com/wolaschka/TIMS/issues/485)"
 
 out=$(run_stop 'See TIMS#486.')
-assert_contains "Repo#N of another repo: hint" "$out" "other repo: use its full URL"
+assert_contains "Repo#N of another repo: qualified template" "$out" "[<owner>/TIMS#486](https://github.com/<owner>/TIMS/issues/486)"
+assert_contains "Repo#N of another repo: hint" "$out" "other repo: fill in its owner"
 
 out=$(run_stop 'See widgets#7.')
-assert_contains "Repo#N of this repo: project link" "$out" "[widgets#7](https://github.com/acme/widgets/issues/7)"
+assert_contains "Repo#N of this repo: qualified project link" "$out" "[acme/widgets#7](https://github.com/acme/widgets/issues/7)"
+assert_not_contains "Repo#N of this repo: no other repo hint" "$out" "belongs to another repo"
 
 out=$(run_stop 'Linked [#1](https://github.com/acme/widgets/issues/1) but bare #1 again.')
 assert_json_field "repeat of a linked ref: block" "$out" ".decision" "block"
 
+out=$(run_stop 'Merge #9.')
+assert_contains "reason asks for qualified links" "$out" "fully qualified Markdown link [owner/repo#N](url)"
+
 out=$(run_stop 'Merge #9.' false "$NOCONF")
 assert_json_field "no CC_GITHUB_REPO: still blocks" "$out" ".decision" "block"
 assert_contains "no CC_GITHUB_REPO: generic hint" "$out" "set CC_GITHUB_REPO"
+assert_contains "no CC_GITHUB_REPO: qualified template" "$out" "[<owner>/<repo>#9]"
 
 # ---- passes ----
 assert_eq "linked refs pass" "" \
