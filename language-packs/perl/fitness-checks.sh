@@ -41,7 +41,7 @@ HRI_COUNT=$(_cc_rg -l 'HashRefInflator' "$PROJECT_DIR/lib" 2>/dev/null | wc -l |
 add_check "No HashRefInflator" "$( [ "$HRI_COUNT" -eq 0 ] && echo 1 || echo 0 )" "${HRI_COUNT} files use HashRefInflator"
 
 # --- Check 4: Safe DateTime usage ---
-NOW_STRING_COUNT=$(_cc_rg -n "now()" "$PROJECT_DIR/lib" --include="*.pm" 2>/dev/null | grep -v 'DateTime->now' | grep -c 'now()' || echo 0)
+NOW_STRING_COUNT=$(_cc_rg -n "now()" "$PROJECT_DIR/lib" --include="*.pm" 2>/dev/null | grep -v 'DateTime->now' | grep -c 'now()') || NOW_STRING_COUNT=0
 add_check "Safe DateTime (no now() strings)" "$( [ "$NOW_STRING_COUNT" -eq 0 ] && echo 1 || echo 0 )" "${NOW_STRING_COUNT} unsafe now() calls"
 
 # --- Check 5: No bare eval ---
