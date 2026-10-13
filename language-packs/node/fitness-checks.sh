@@ -37,7 +37,7 @@ REQUIRE_COUNT=$(_cc_rg -n '\brequire(' "$SRC_DIR" --include="*.ts" --include="*.
 add_check "ES imports (no require)" "$( [ "$REQUIRE_COUNT" -eq 0 ] && echo 1 || echo 0 )" "${REQUIRE_COUNT} require() calls"
 
 # --- Check 6: Strict equality ---
-LOOSE_EQ=$(_cc_rg -n '[^!=]=[^=]' "$SRC_DIR" --include="*.ts" --include="*.js" 2>/dev/null | grep -v node_modules | grep -c '==[^=]' || echo 0)
+LOOSE_EQ=$(_cc_rg -n '[^!=]=[^=]' "$SRC_DIR" --include="*.ts" --include="*.js" 2>/dev/null | grep -v node_modules | grep -c '==[^=]') || LOOSE_EQ=0
 add_check "Strict equality (===)" "$( [ "$LOOSE_EQ" -le 2 ] && echo 1 || echo 0 )" "${LOOSE_EQ} loose equality checks"
 
 _cc_fitness_result "js checks"
