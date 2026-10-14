@@ -6,7 +6,7 @@ aa948735fa6bd0d3582abff1323285af	./.cognitive-core/AGENTS_README.md
 17f2dcdc65b30b218d94fc794dcbc43e	./.cognitive-core/cognitive-core/check-update.sh
 2fc08fe8f49e21e94118f1a82877a374	./.cognitive-core/cognitive-core/context-cleanup.sh
 a5afaa60a4328f9bf51d34a6b228d6b4	./.cognitive-core/cognitive-core/health-check.sh
-94795a22a1847c7c4cfe32a952ed8f02	./.cognitive-core/cognitive-core/version.json
+586af68a1aed2fca11044f858cd46195	./.cognitive-core/cognitive-core/version.json
 47b561a9cb3594c789ecad8b6b8e6766	./.cognitive-core/compact-rules.md
 7f3cfa96a9afa2db9b937b1e32cb56a0	./.cognitive-core/fitness-checks.sh
 93a614f0d620a8305b6f7ed86bf2ad36	./.cognitive-core/gitattributes-lang
