@@ -936,7 +936,7 @@ AFFECTED_FILES=$(grep -rl "<keyword>" --include="*.md" --include="*.sh" --includ
 # grep -rl --no-ignore "<keyword>" . 2>/dev/null
 
 # Count affected files for complexity adjustment
-FILE_COUNT=$(echo "$AFFECTED_FILES" | grep -c '.' || echo 0)
+FILE_COUNT=$(echo "$AFFECTED_FILES" | grep -c '.') || FILE_COUNT=0
 ```
 
 If `FILE_COUNT > 10` AND complexity is not already Complex, upgrade to Complex (L).
