@@ -15,9 +15,10 @@ SCORE_RE='^[0-9]+ [0-9]+/[0-9]+ '
 
 EMPTY=$(create_test_dir)
 FULL=$(create_test_dir)
-mkdir -p "${FULL}/src"
+mkdir -p "${FULL}/src" "${FULL}/lib"
 printf 'var x = 1;\nconsole.log(x);\nconst z = require("z");\n' > "${FULL}/src/a.ts"
 printf 'import os\n\ndef f(x):\n    try:\n        return os.path.join(x)\n    except:\n        pass\n\ndef g(y) -> int:\n    return 1\n' > "${FULL}/src/a.py"
+printf 'package A;\nuse strict;\nmy $c = "DBIx::Class::ResultClass::HashRefInflator";\nmy $t = now();\neval { die };\n1;\n' > "${FULL}/lib/A.pm"
 
 # grep fallback always; rg mode only runs when bash finds a real rg binary
 # (often not on CI runners), so _cc_bre_to_rg is unit-tested below as well
@@ -34,6 +35,10 @@ for mode in $modes; do
         out=$(_CC_HAS_RG=$mode bash "$script" "$EMPTY" 2>&1) || rc=$?
         assert_eq "${pack} (${engine}): empty project exits 0" "0" "$rc"
         assert_matches "${pack} (${engine}): empty project prints a score" "$out" "$SCORE_RE"
+        rc=0
+        out=$(_CC_HAS_RG=$mode bash "$script" "$FULL" 2>&1) || rc=$?
+        assert_eq "${pack} (${engine}): project with matches exits 0" "0" "$rc"
+        assert_matches "${pack} (${engine}): project with matches prints a score" "$out" "$SCORE_RE"
     done
 
     rc=0
@@ -49,6 +54,11 @@ for mode in $modes; do
     assert_contains "python (${engine}): typed ratio" "$out" "1/2 typed (50%)"
     assert_contains "python (${engine}): bare except count" "$out" "1 bare except blocks"
     assert_contains "python (${engine}): os.path count" "$out" "1 os.path usages"
+
+    out=$(_CC_HAS_RG=$mode bash "${ROOT_DIR}/language-packs/perl/fitness-checks.sh" "$FULL" 2>&1) || true
+    assert_contains "perl (${engine}): HashRefInflator count" "$out" "1 files use HashRefInflator"
+    assert_contains "perl (${engine}): now() count" "$out" "1 unsafe now() calls"
+    assert_contains "perl (${engine}): bare eval count" "$out" "1 bare eval blocks"
 done
 
 rm -rf "$EMPTY" "$FULL"
