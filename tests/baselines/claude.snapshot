@@ -4,9 +4,9 @@ aa948735fa6bd0d3582abff1323285af	./.claude/AGENTS_README.md
 17f2dcdc65b30b218d94fc794dcbc43e	./.claude/cognitive-core/check-update.sh
 2fc08fe8f49e21e94118f1a82877a374	./.claude/cognitive-core/context-cleanup.sh
 a5afaa60a4328f9bf51d34a6b228d6b4	./.claude/cognitive-core/health-check.sh
-33703657081452405929b25e61ef8926	./.claude/cognitive-core/version.json
+ddd8bffe21c600ef09ce6030a7808ba4	./.claude/cognitive-core/version.json
 47b561a9cb3594c789ecad8b6b8e6766	./.claude/compact-rules.md
-7f3cfa96a9afa2db9b937b1e32cb56a0	./.claude/fitness-checks.sh
+59572ce3152ae50bf90a0a9404b84dd9	./.claude/fitness-checks.sh
 93a614f0d620a8305b6f7ed86bf2ad36	./.claude/gitattributes-lang
 c3e0c99f2107171af0da02169a507681	./.claude/gitignore
 d0cf4e70f3af78788d17385b8b75aaca	./.claude/hooks/_lib.sh
