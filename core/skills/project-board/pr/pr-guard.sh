@@ -7,8 +7,8 @@
 #   pr-guard.sh review-record <PR> --sha <sha> --result PASS|FAIL --body-file <file>
 #   pr-guard.sh conf-hash            # current gate config hash (gate stamp field)
 #
-# The command text is the Bash command as typed, heredoc bodies included; the
-# guard reads the first `gh pr <mode>` in it. Every GitHub call happens here,
+# The command text is the Bash command as typed, heredoc bodies included;
+# cmd_lexer.py finds the one `gh pr <mode>` in it. Every GitHub call happens here,
 # callers pass plain arguments. Rules, config and the gate stamp format:
 # references/pr-guard.md
 #
@@ -83,177 +83,33 @@ pg_conf_hash() {
         done
         printf 'CC_LINT_COMMAND=%s\n' "${CC_LINT_COMMAND:-}"
         printf 'CC_TEST_COMMAND=%s\n' "${CC_TEST_COMMAND:-}"
-    } | python3 -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())'
+    } | python3 -I -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())'
 }
 
-# ---- Command text -> arguments of the first `gh pr <mode>` ----
-# A small shell lexer: quotes, backslashes, $( ), heredocs (their body joins the
-# word that holds the operator, so --body "$(cat <<'EOF' ... EOF)" keeps its text),
-# redirections dropped. Prints the arguments NUL-separated; exit 1 when absent.
-# shellcheck disable=SC2016
-PG_LEXER='
-import re, sys
-mode, s = sys.argv[1], sys.argv[2]
-tokens, cur, stack, pending = [], [], [], []
-state = {"word": False, "drop": False}
-
-def flush():
-    if state["word"] or cur:
-        if not state["drop"]:
-            tokens.append(("w", "".join(cur)))
-        state["drop"] = False
-    del cur[:]
-    state["word"] = False
-
-i, n = 0, len(s)
-while i < n:
-    c = s[i]
-    top = stack[-1] if stack else ""
-    if top == "\x27":
-        if c == "\x27":
-            stack.pop()
-        else:
-            cur.append(c)
-        i += 1
-        continue
-    if c == "\\" and i + 1 < n:
-        nxt = s[i + 1]
-        if nxt != "\n":
-            if top == "\"" and nxt not in "$`\"\\":
-                cur.append(c)
-            cur.append(nxt)
-            state["word"] = True
-        i += 2
-        continue
-    if top == "\"":
-        if c == "\"":
-            stack.pop()
-        elif s.startswith("$(", i):
-            stack.append("$(")
-            cur.append("$(")
-            i += 2
-            continue
-        else:
-            cur.append(c)
-        i += 1
-        continue
-    # unquoted: top level or inside $( )
-    if c == "\n" and pending:
-        i += 1
-        bodies = []
-        for strip, delim in pending:
-            body = []
-            while i < n:
-                j = s.find("\n", i)
-                j = n if j < 0 else j
-                line = s[i:j]
-                i = j + 1
-                if (line.lstrip("\t") if strip else line) == delim:
-                    break
-                body.append(line)
-            bodies.append("\n".join(body))
-        del pending[:]
-        if stack:
-            cur.append("\n" + "\n".join(bodies) + "\n")
-        else:
-            flush()
-            tokens.append(("op", "\n"))
-        continue
-    if s.startswith("<<", i) and not s.startswith("<<<", i):
-        j = i + 2
-        strip = j < n and s[j] == "-"
-        j += 1 if strip else 0
-        while j < n and s[j] in " \t":
-            j += 1
-        if j < n and s[j] in "\x27\"":
-            k = s.find(s[j], j + 1)
-            k = n if k < 0 else k
-            delim, end = s[j + 1:k], k + 1
-        else:
-            k = j
-            while k < n and s[k] not in " \t\n;&|<>()":
-                k += 1
-            delim, end = s[j:k].replace("\\", ""), k
-        pending.append((strip, delim))
-        if stack:
-            cur.append(s[i:end])
-        else:
-            flush()
-        i = end
-        continue
-    if c == "\x27" or c == "\"":
-        stack.append(c)
-        state["word"] = True
-        i += 1
-        continue
-    if s.startswith("$(", i):
-        stack.append("$(")
-        cur.append("$(")
-        state["word"] = True
-        i += 2
-        continue
-    if stack:
-        if c == "(":
-            stack.append("(")
-        elif c == ")":
-            stack.pop()
-        cur.append(c)
-        i += 1
-        continue
-    if c in " \t":
-        flush()
-    elif c in "\n;&|()":
-        flush()
-        tokens.append(("op", c))
-    elif c in "<>":
-        if cur and "".join(cur).isdigit():
-            del cur[:]
-            state["word"] = False
-        else:
-            flush()
-        while i < n and s[i] in "<>&":
-            i += 1
-        state["drop"] = True
-        while i < n and s[i] in " \t":
-            i += 1
-        continue
-    elif c == "#" and not cur and not state["word"]:
-        while i < n and s[i] != "\n":
-            i += 1
-        continue
-    else:
-        cur.append(c)
-        state["word"] = True
-    i += 1
-flush()
-
-# gh is the command word, after assignments and env, command, exec, sudo, time, nohup
-words = []
-for kind, text in tokens + [("op", ";")]:
-    if kind == "w":
-        words.append(text)
-        continue
-    k = 0
-    while k < len(words) and (words[k] in ("env", "command", "exec", "sudo", "time", "nohup")
-                              or re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[k])):
-        k += 1
-    cmd = words[k:k + 3]
-    if len(cmd) == 3 and (cmd[0] == "gh" or cmd[0].endswith("/gh")) and cmd[1:] == ["pr", mode]:
-        sys.stdout.write("".join(a + "\0" for a in words[k + 3:]))
-        sys.exit(0)
-    words = []
-sys.exit(1)
-'
-
-# pg_args <mode> <text>: fills PG_ARGS; exit 3 when the text has no gh pr <mode>
+# pg_args <mode> <text>: fills PG_ARGS with the arguments of the one `gh pr <mode>`
+# in the command text (lexer: cmd_lexer.py). Fails closed: a text the lexer cannot
+# place but that still looks like gh ... pr <mode> is refused, a lexer failure is exit 2.
 pg_args() {
-    local tmp rc=0 a
+    local tmp rc=0 a loose
     tmp=$(mktemp)
-    python3 -c "$PG_LEXER" "$1" "$2" > "$tmp" || rc=$?
+    python3 -I "$PG_DIR/cmd_lexer.py" "$1" "$2" > "$tmp" 2>/dev/null || rc=$?
     PG_ARGS=()
     while IFS= read -r -d '' a; do PG_ARGS+=("$a"); done < "$tmp"
     rm -f "$tmp"
-    [ "$rc" -eq 0 ] || pg_na "no gh pr $1 command found"
+    loose="(^|[^[:alnum:]_])gh([^[:alnum:]_]|$)(.*[[:space:]])?pr[[:space:]]+$1([^[:alnum:]_]|$)"
+    case "$rc" in
+        0)  ;;
+        10) if [[ "$2" =~ $loose ]]; then
+                pg_rule "cannot parse this command" "run gh pr $1 as a plain command"
+                pg_verdict "gh pr $1"
+            fi
+            pg_na "no gh pr $1 command found" ;;
+        11) pg_rule "more than one gh pr $1 in one command" "run one gh pr $1 per command"
+            pg_verdict "gh pr $1" ;;
+        14) pg_na "gh pr $1 only mentioned (echo, printf or gh arguments)" ;;
+        *)  echo "pr-guard: command lexer failed (exit $rc)" >&2
+            exit 2 ;;
+    esac
 }
 
 # pg_repo_applies <repo flag value>: exit 3 for another repository
@@ -266,7 +122,7 @@ pg_repo_applies() {
 # Close[sd]? Fix(e[sd])? Resolve[sd]? Refs, then #N or <this repo>#N (case-insensitive);
 # other repositories, URLs and bare #N are ignored. stdin: text; stdout: numbers
 pg_text_refs() {
-    _PG_REPO="$CC_GITHUB_REPO" python3 -c '
+    _PG_REPO="$CC_GITHUB_REPO" python3 -I -c '
 import os, re, sys
 repo = os.environ["_PG_REPO"].lower()
 pat = re.compile(r"(?<![\w/.-])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs):?[ \t]+(?:([\w.-]+/[\w.-]+))?#([0-9]+)(?!\w)", re.I)
@@ -283,7 +139,7 @@ pg_issue_rule() {
     out=$("$BASH" "$PG_GITHUB_SH" board status "$n" 2>"$err") || rc=$?
     if [ "$rc" -ne 0 ]; then
         local msg
-        msg=$(python3 -c 'import json, sys; print(json.load(sys.stdin).get("error", ""))' < "$err" 2>/dev/null || true)
+        msg=$(python3 -I -c 'import json, sys; print(json.load(sys.stdin).get("error", ""))' < "$err" 2>/dev/null || true)
         [ -n "$msg" ] || msg=$(grep -v '^[[:space:]]*$' "$err" | head -1 || true)
         rm -f "$err"
         if [ "$rc" -eq 1 ]; then
@@ -294,7 +150,7 @@ pg_issue_rule() {
         exit 2
     fi
     rm -f "$err"
-    facts=$(python3 -c '
+    facts=$(python3 -I -c '
 import json, sys
 d = json.load(sys.stdin)
 print(d.get("status_key") or "")
@@ -400,7 +256,7 @@ pg_pr_view() {
         [ -n "$sel" ] && [ "$sel" != "HEAD" ] || pg_na "no PR given and no current branch"
     fi
     json=$(pg_gh pr view "$sel" --repo "$CC_GITHUB_REPO" --json number,state,isDraft,headRefOid,baseRefName) || exit $?
-    facts=$(python3 -c '
+    facts=$(python3 -I -c '
 import json, sys
 d = json.load(sys.stdin)
 for k in ("number", "state", "isDraft", "headRefOid", "baseRefName"):
@@ -422,7 +278,7 @@ pg_fetch_status() {
 pg_required_checks() {
     local rules branch
     rules=$(pg_gh api "repos/$CC_GITHUB_REPO/rules/branches/$PR_BASE") || exit $?
-    REQUIRED=$(python3 -c '
+    REQUIRED=$(python3 -I -c '
 import json, sys
 seen = []
 for r in json.load(sys.stdin) or []:
@@ -434,7 +290,7 @@ print("\n".join(seen))' <<< "$rules" 2>/dev/null) || { echo "pr-guard: rules: un
     REQUIRED_SOURCE=ruleset
     [ -n "$REQUIRED" ] && return 0
     branch=$(pg_gh api "repos/$CC_GITHUB_REPO/branches/$PR_BASE") || exit $?
-    REQUIRED=$(python3 -c '
+    REQUIRED=$(python3 -I -c '
 import json, sys
 rsc = ((json.load(sys.stdin).get("protection") or {}).get("required_status_checks") or {})
 seen = []
@@ -452,7 +308,8 @@ print("\n".join(seen))' <<< "$branch" 2>/dev/null) || { echo "pr-guard: branch: 
 pg_checks_not_green() {
     local runs
     runs=$(pg_gh api "repos/$CC_GITHUB_REPO/commits/$PR_HEAD/check-runs?per_page=100") || exit $?
-    _PG_RUNS="$runs" _PG_STATUS="$STATUS_JSON" _PG_REQUIRED="$REQUIRED" _PG_REVIEW="$PG_REVIEW_CONTEXT" python3 -c '
+    _PG_RUNS="$runs" _PG_STATUS="$STATUS_JSON" _PG_REQUIRED="$REQUIRED" _PG_REVIEW="$PG_REVIEW_CONTEXT" \
+    _PG_ALLOW_NONE="${CC_PR_GUARD_ALLOW_NO_CHECKS:-false}" python3 -I -c '
 import json, os
 env = os.environ
 state = {}
@@ -468,7 +325,7 @@ for st in json.loads(env["_PG_STATUS"]).get("statuses") or []:
     state[st.get("context", "")] = st.get("state", "")
 required = [r for r in env["_PG_REQUIRED"].splitlines() if r]
 names = required or sorted(k for k in state if k != env["_PG_REVIEW"])
-if not names:
+if not names and env["_PG_ALLOW_NONE"] != "true":
     print("(any check)\tmissing")
 for name in names:
     if state.get(name, "missing") != "success":
@@ -484,7 +341,8 @@ pg_checks_rule() {
     while IFS="$(printf '\t')" read -r name st; do
         [ -n "$name" ] || continue
         if [ "$name" = "(any check)" ]; then
-            pg_rule "no checks reported on HEAD ${PR_HEAD:0:7}" "$1"
+            pg_rule "no checks reported on HEAD ${PR_HEAD:0:7}" \
+                "wait for CI to start; a repository without CI sets CC_PR_GUARD_ALLOW_NO_CHECKS=true"
         else
             pg_rule "check '$name' is $st on HEAD ${PR_HEAD:0:7}" "$1"
         fi
@@ -497,7 +355,7 @@ pg_stamp_reason() {
     top=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "not a git repository"; return 0; }
     file="$top/.cognitive-core/gate/$PR_HEAD.json"
     [ -f "$file" ] || { echo "no gate stamp for ${PR_HEAD:0:7}"; return 0; }
-    _PG_SHA="$PR_HEAD" _PG_HASH="$(pg_conf_hash)" python3 -c '
+    _PG_SHA="$PR_HEAD" _PG_HASH="$(pg_conf_hash)" python3 -I -c '
 import json, os, sys
 try:
     d = json.load(sys.stdin)
@@ -518,7 +376,7 @@ elif d.get("conf_hash") != os.environ["_PG_HASH"]:
 pg_review_rule() {
     local st
     pg_fetch_status
-    st=$(_PG_CTX="$PG_REVIEW_CONTEXT" python3 -c '
+    st=$(_PG_CTX="$PG_REVIEW_CONTEXT" python3 -I -c '
 import json, os, sys
 for s in json.load(sys.stdin).get("statuses") or []:
     if s.get("context") == os.environ["_PG_CTX"]:

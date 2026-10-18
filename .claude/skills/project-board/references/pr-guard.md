@@ -10,15 +10,36 @@ pr/pr-guard.sh review-record <PR> --sha <sha> --result PASS|FAIL --body-file <fi
 pr/pr-guard.sh conf-hash
 ```
 
-`<command text>` is the Bash command as typed, heredoc bodies included. The
-guard reads the first `gh pr <mode>` in it.
+`<command text>` is the Bash command as typed, heredoc bodies included.
+`pr/cmd_lexer.py` (a small shell lexer, run with `python3 -I`) finds `gh pr <mode>` in
+command position: the first word of a command, also after `;`, `&&`, `||`, `|`, `( )`,
+`{ }`, `!`, `if`/`then`/`do`/`else`/`elif`/`while`/`until`, assignments, and the prefixes
+`env`, `sudo`, `time`, `timeout`, `nice`, `command`, `exec`, `nohup` with their options;
+inside `$( )` and backticks too; `\gh` and `/path/to/gh` count; quotes include `$'...'`.
+
+- Exactly one `gh pr <mode>` is checked; two or more in one text are refused (one per command).
+- Mentioned only as arguments of `echo`, `printf` or another `gh` command: not applicable.
+- Otherwise, when the text still matches the loose pattern
+  `(^|[^[:alnum:]_])gh([^[:alnum:]_]|$)(.*[[:space:]])?pr[[:space:]]+<mode>` (for example
+  `bash -c "gh pr merge 5"`, `eval`, `xargs`, a heredoc piped to `sh`), it is refused:
+  "cannot parse this command; run gh pr <mode> as a plain command".
+- A lexer failure (python3 missing or crashing) is exit 2, never "not applicable".
 
 | Exit | Meaning |
 |------|---------|
 | 0 | allowed |
-| 1 | a rule is violated (each failure is listed with its fix), or a usage error |
-| 2 | GitHub failure (network, auth, unexpected answer): report it, do not work around it |
+| 1 | a rule is violated (each failure is listed with its fix), the command cannot be parsed, or a usage error |
+| 2 | GitHub failure (network, auth, unexpected answer) or lexer failure: report it, do not work around it |
 | 3 | not applicable (no such command, not a git repository, no conf or `CC_GITHUB_REPO`, another `--repo`, closed PR, `ready` on a non-draft or `--undo`, `merge --disable-auto`) |
+
+### Threat model
+
+The guard keeps an honest workflow on its rails: it stops Claude (or a person) from creating,
+readying or merging a PR out of order by mistake. It is not a security boundary against an
+adversary. Dynamic forms cannot be lexed and pass as not applicable: `$GH pr create`, shell
+aliases and functions, a script that runs `gh`, or the API directly (`gh api .../merge`; the
+hook denies the known API bypasses separately, #387). The authoritative checks are on GitHub:
+rulesets, branch protection and the PR lifecycle workflow (#389).
 
 ## Rules
 
@@ -48,12 +69,16 @@ bare `#N` are ignored.
 
 **Required checks**: the base branch's rulesets (`GET repos/{o}/{r}/rules/branches/{base}`,
 `required_status_checks` rules), else legacy branch protection (`GET repos/{o}/{r}/branches/{base}`),
-else every check run and commit status on the head (except `cc-review`), at least one.
+else every check run and commit status on the head (except `cc-review`), at least one
+(a repository without CI sets `CC_PR_GUARD_ALLOW_NO_CHECKS=true`).
 A check is green when it completed as success, neutral or skipped (check runs) or is `success` (statuses).
 
 **`review-record`** refuses a SHA that is not the PR head, then posts a PR comment that starts
 with `<!-- cc-review:v1 result=PASS|FAIL sha=<sha> -->` and sets the commit status `cc-review`
 (`success` or `failure`) on that SHA. A new commit has no `cc-review` status until it is reviewed.
+The record is advisory: it is written with the same human `gh` token that creates and merges
+the PR, so it proves that a review ran for that commit, not who reviewed it. Separating the
+reviewer from the author needs #388 (`CC_PR_REVIEW_DISTINCT`) and a separate identity (#382).
 
 ## Configuration (`cognitive-core.conf`)
 
@@ -62,6 +87,7 @@ with `<!-- cc-review:v1 result=PASS|FAIL sha=<sha> -->` and sets the commit stat
 | `CC_GITHUB_REPO` | (required) | `owner/repo` the guard applies to |
 | `CC_PR_GATE_SOURCE` | `either` | `stamp`, `checks` or `either`; any other value is a violation |
 | `CC_PR_GUARD_ISSUE_OPTIONAL` | (empty) | commit/branch types that need no issue, e.g. `"docs chore"` |
+| `CC_PR_GUARD_ALLOW_NO_CHECKS` | `false` | `true`: no required checks and no checks on the head counts as green (repositories without CI) |
 | `CC_BRANCH_BASE` | `main` | base for `--fill` when `--base` is not given |
 
 ## Gate stamp format

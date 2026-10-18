@@ -335,6 +335,13 @@ assert_contains "${S}checks: none required -> every check counts" "$OUT" "check 
 printf '{"statuses":[{"context":"cc-review","state":"success"}]}\n' > "${FIX}/status-${H1}.json"
 run_pg "${RD[@]}" CC_PR_GATE_SOURCE=checks -- check ready "gh pr ready 5"
 assert_contains "${S}checks: none required, none reported (cc-review does not count)" "$OUT" "no checks reported on HEAD"
+assert_contains "${S}checks: none reported: refusal names the opt-out" "$OUT" "CC_PR_GUARD_ALLOW_NO_CHECKS=true"
+conf 'CC_PR_GUARD_ALLOW_NO_CHECKS="true"'
+run_pg "${RD[@]}" CC_PR_GATE_SOURCE=checks -- check ready "gh pr ready 5"
+assert_eq "${S}CC_PR_GUARD_ALLOW_NO_CHECKS=true: no checks accepted" "0" "$RC"
+run_pg "${RD[@]}" CC_PR_GATE_SOURCE=checks STUB_RUNS=runs-extra-red.json -- check ready "gh pr ready 5"
+assert_eq "${S}CC_PR_GUARD_ALLOW_NO_CHECKS=true: a red check still refuses" "1" "$RC"
+conf
 review "$H1" success
 
 run_pg "${RD[@]}" STUB_RULES=rules-ci.json STUB_RUNS=runs-green.json -- check ready "gh pr ready 5"
@@ -472,6 +479,90 @@ assert_eq "${S}PR not a number: usage error" "1|" "${RC}|${CALLS}"
 }
 
 # =============================================================================
+# Lexer table: <expected>|<command text>, one per line, \n = newline
+#   allowed: found once (merge passes); na: exit 3; parse: refused as unparsable;
+#   multi: refused, more than one command
+LEXER_TABLE='allowed|env gh pr merge 5
+allowed|env -i PATH=/usr/bin gh pr merge 5
+allowed|env -u HOME FOO=1 gh pr merge 5
+allowed|command gh pr merge 5
+allowed|\gh pr merge 5
+allowed|/usr/bin/gh pr merge 5
+allowed|sudo -u bob gh pr merge 5
+allowed|timeout -s KILL 30 gh pr merge 5
+allowed|nice -n 5 time -p gh pr merge 5
+allowed|( gh pr merge 5 )
+allowed|{ gh pr merge 5; }
+allowed|x=$(gh pr merge 5)
+allowed|x=`gh pr merge 5`
+allowed|echo "merged: $(gh pr merge 5)"
+allowed|if gh pr merge 5; then echo ok; fi
+allowed|while false; do gh pr merge 5; done
+allowed|git fetch; gh pr merge 5
+allowed|git fetch && gh pr merge 5 || echo failed
+allowed|! gh pr merge 5
+allowed|$'"'"'gh'"'"' pr merge 5
+allowed|gh pr merge 5 # gh pr merge 6 in a comment
+parse|bash -c "gh pr merge 5"
+parse|eval '"'"'gh pr merge 5'"'"'
+parse|xargs gh pr merge <<< 5
+parse|cat <<EOF | sh\ngh pr merge 5\nEOF
+multi|gh pr merge 5 && gh pr merge 6
+multi|gh pr merge 5; x=$(gh pr merge 6)
+na|echo gh pr merge 5
+na|printf "%s" "gh pr merge 5"
+na|gh issue comment 5 --body "then gh pr merge 5"
+na|gh pr view 5
+na|$GH pr merge 5'
+
+lexer_cases() {
+local S="$1" expected text verdict
+review "$H1" success
+while IFS= read -r entry; do
+    expected="${entry%%|*}"
+    text="${entry#*|}"
+    text="${text//\\n/$'\n'}"
+    run_pg STUB_HEAD="$H1" STUB_RULES=rules-ci.json STUB_RUNS=runs-green.json -- check merge "$text"
+    case "$RC:$OUT" in
+        "0:pr-guard: gh pr merge allowed"*) verdict=allowed ;;
+        3:*) verdict=na ;;
+        *"cannot parse this command"*"Fix: run gh pr merge as a plain command"*) verdict=parse ;;
+        *"more than one gh pr merge in one command"*) verdict=multi ;;
+        *) verdict="rc=$RC $OUT $ERR" ;;
+    esac
+    assert_eq "${S}lexer: ${entry#*|}" "$expected" "$verdict"
+done <<< "$LEXER_TABLE"
+
+# Fail closed: a broken python3 is a lexer failure (exit 2), never "not applicable"
+mkdir -p "${WORK}/badpy"
+for code in 1 127; do
+    printf '#!/bin/sh\nexit %s\n' "$code" > "${WORK}/badpy/python3"
+    chmod +x "${WORK}/badpy/python3"
+    run_pg PATH="${WORK}/badpy:${STUB}:${PATH}" -- check merge "gh pr merge 5"
+    assert_eq "${S}python3 exits ${code}: exit 2, no gh call" "2|" "${RC}|${CALLS}"
+    assert_contains "${S}python3 exits ${code}: message" "$ERR" "pr-guard: command lexer failed"
+done
+
+# Isolated python: modules planted in the working directory are never imported
+for m in json re hashlib; do
+    printf 'open(%s, "a").write("%s\\n")\n' "'${WORK}/planted.log'" "$m" > "${REPO}/${m}.py"
+done
+rm -f "${WORK}/planted.log"
+stamp "$H1" PASS "$HASH"
+run_pg STUB_HEAD="$H1" STUB_RULES=rules-ci.json STUB_RUNS=runs-green.json -- check merge "gh pr merge 5"
+assert_eq "${S}planted modules: merge still allowed" "0" "$RC"
+run_pg STUB_HEAD="$H1" STUB_DRAFT=true CC_PR_GATE_SOURCE=stamp -- check ready "gh pr ready 5"
+assert_eq "${S}planted modules: stamp read, ready allowed" "0" "$RC"
+conf 'CC_PROJECT_ID=""'
+run_pg -- check create "gh pr create -a @me -t x -b 'Fixes #13'"
+assert_eq "${S}planted modules: create allowed" "0" "$RC"
+conf
+assert_eq "${S}planted json.py, re.py, hashlib.py never imported" "no" "$([ -f "${WORK}/planted.log" ] && echo yes || echo no)"
+rm -f "${REPO}/json.py" "${REPO}/re.py" "${REPO}/hashlib.py"
+no_stamp
+}
+
+# =============================================================================
 hash_cases() {
 local S="$1"
 run_pg -- conf-hash
@@ -490,6 +581,7 @@ create_cases ""
 ready_cases ""
 merge_cases ""
 review_cases ""
+lexer_cases ""
 hash_cases ""
 if [ -x /bin/bash ] && [ "$(/bin/bash -c 'echo ${BASH_VERSINFO[0]}')" = "3" ]; then
     SHELL_UNDER_TEST=/bin/bash
@@ -497,6 +589,7 @@ if [ -x /bin/bash ] && [ "$(/bin/bash -c 'echo ${BASH_VERSINFO[0]}')" = "3" ]; t
     ready_cases "bash 3.2: "
     merge_cases "bash 3.2: "
     review_cases "bash 3.2: "
+    lexer_cases "bash 3.2: "
     hash_cases "bash 3.2: "
 else
     _skip "bash 3.2 not available (/bin/bash is not 3.x)"
