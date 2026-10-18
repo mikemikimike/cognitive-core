@@ -7,7 +7,7 @@
 | **Project** | cognitive-core |
 | **Description** | AI-augmented development framework for coding assistants |
 | **Organization** | mindcockpit-ai |
-| **Language** | Bash (primary) + Python (adapters) |
+| **Language** | Bash (primary) + Python (adapters, skill helpers) |
 | **Architecture** | Layered (core/, adapters/, language-packs/, database-packs/) |
 | **Main Branch** | main |
 | **Test Command** | `bash tests/run-all.sh` |
@@ -61,8 +61,9 @@ cognitive-core/
 - Use `_lib.sh` helper functions for JSON parsing and hook responses
 - ShellCheck clean at severity warning (suite 01 checks every tracked `*.sh`; options in `.shellcheckrc`; CI pins the version)
 
-### Python (adapters only)
-- Python 3.10+ minimum
+### Python (adapters and skill helpers)
+- Adapters: Python 3.10+ minimum
+- Skill helpers (e.g. `core/skills/project-board/pr/cmd_lexer.py`): stdlib only, must also run on the macOS system Python (3.9); run with `python3 -I` so modules in the project checkout are never imported
 - Type hints on function signatures
 - argparse for CLI tools
 - No external dependencies beyond stdlib (Aider projects already have Python)

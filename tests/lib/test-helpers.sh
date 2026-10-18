@@ -127,7 +127,7 @@ assert_ne() {
 
 assert_contains() {
     local label="$1" haystack="$2" needle="$3"
-    if grep -qF "$needle" <<< "$haystack"; then
+    if grep -qF -e "$needle" <<< "$haystack"; then
         _pass "$label"
     else
         _fail "$label" "output does not contain '${needle}'"
@@ -136,7 +136,7 @@ assert_contains() {
 
 assert_not_contains() {
     local label="$1" haystack="$2" needle="$3"
-    if ! grep -qF "$needle" <<< "$haystack"; then
+    if ! grep -qF -e "$needle" <<< "$haystack"; then
         _pass "$label"
     else
         _fail "$label" "output should not contain '${needle}'"

@@ -51,6 +51,7 @@ suite_pretty_name() {
         30-board-automation.sh) echo "Board Automation" ;;
         31-board-provider.sh) echo "Board Provider" ;;
         32-docs-consistency.sh) echo "Docs Consistency" ;;
+        34-pr-guard.sh) echo "PR Guard" ;;
         *) echo "$1" ;;
     esac
 }
