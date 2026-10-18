@@ -387,6 +387,13 @@ Notes:
 - Fork and Dependabot PRs get no secrets, so their merge moves nothing; the issue close and the
   daily reconciliation still apply.
 
+### PR Lifecycle Guard (GitHub)
+
+`pr/pr-guard.sh` decides whether a PR may be created, marked ready or merged (issue In Progress and
+assigned, gate evidence, green required checks, a `cc-review` record for the head commit) and records
+reviews (`review-record`). Rules, exit codes, configuration and the gate stamp format:
+`references/pr-guard.md`.
+
 ### Area (Row Grouping)
 
 Customizable per project. The skill tracks area by the `area:<value>` label only; it does not set the board's Area field. Default domains:
