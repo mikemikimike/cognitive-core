@@ -20,10 +20,14 @@ printf 'var x = 1;\nconsole.log(x);\nconst z = require("z");\n' > "${FULL}/src/a
 printf 'import os\n\ndef f(x):\n    try:\n        return os.path.join(x)\n    except:\n        pass\n\ndef g(y) -> int:\n    return 1\n' > "${FULL}/src/a.py"
 printf 'package A;\nuse strict;\nmy $c = "DBIx::Class::ResultClass::HashRefInflator";\nmy $t = now();\neval { die };\n1;\n' > "${FULL}/lib/A.pm"
 
-# grep fallback always; rg mode only runs when bash finds a real rg binary
-# (often not on CI runners), so _cc_bre_to_rg is unit-tested below as well
+# grep fallback always; rg mode only runs when bash finds a real rg binary,
+# so _cc_bre_to_rg is unit-tested below as well. CI sets CC_TEST_REQUIRE_RG=1
+# so a runner without rg fails instead of silently skipping rg mode (#416)
 modes="0"
 command -v rg &>/dev/null && modes="0 1"
+if [ "${CC_TEST_REQUIRE_RG:-0}" = "1" ]; then
+    assert_eq "rg on PATH (CC_TEST_REQUIRE_RG=1)" "0 1" "$modes"
+fi
 
 for mode in $modes; do
     engine="grep"
