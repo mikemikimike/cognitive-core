@@ -59,6 +59,19 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/validate-fetch.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/angular-version-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/spring-boot-version-guard.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [

@@ -234,6 +234,9 @@ CC_ORPHAN_AUTO_KILL="false"
 # ===== EXPERIMENTAL =====
 # MCP servers (space-separated): context7
 CC_MCP_SERVERS="context7"
+# cognitive-core MCP server (.cognitive-core/mcp-server + .mcp.json) for the claude
+# platform: true|false (default false; Claude Code uses the hooks natively)
+CC_MCP_SERVER="false"
 
 # ===== AGENT TEAMS (EXPERIMENTAL) =====
 # Requires Claude Code v2.1.32+ with CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1

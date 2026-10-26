@@ -84,6 +84,20 @@ python adapters/claude/convert.py skills/atomic/validate/skill.yaml
 python adapters/claude/convert.py skills/ --output ~/.claude/skills/
 ```
 
+## Generated settings.json
+
+`install.sh` renders `core/templates/settings.json.tmpl` and passes it through
+`settings-render.py` (python3 required):
+
+- A framework hook is wired only if it is in `CC_HOOKS` and installed in `.claude/hooks/`.
+- `CC_SECURITY_LEVEL="strict"` adds no allow rules.
+- An existing `settings.json` is merged, not overwritten: user hooks, permissions, env and other
+  keys stay; framework hook wiring follows `CC_HOOKS`. A changed file is backed up to
+  `settings.json.bak.<timestamp>` and the diff is printed.
+
+The cognitive-core MCP server (`.cognitive-core/mcp-server/`, `.mcp.json`) is installed only with
+`CC_MCP_SERVER="true"`; Claude Code runs the hooks natively.
+
 ## Skill Locations
 
 | Scope | Location | Purpose |

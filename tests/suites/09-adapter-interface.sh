@@ -106,6 +106,7 @@ for adapter in claude vscode intellij; do
     bash -c "
         info() { :; }; warn() { :; }
         SCRIPT_DIR='${mcp_root}/fw'; CC_INSTALL_DIR='${proj}/.cognitive-core'
+        CC_MCP_SERVER=true  # claude: opt-in (#345)
         source '${ROOT_DIR}/adapters/_adapter-lib.sh'
         source '${ROOT_DIR}/adapters/${adapter}/adapter.sh'
         _adapter_post_install '${proj}'

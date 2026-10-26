@@ -54,6 +54,7 @@ suite_pretty_name() {
         34-pr-guard.sh) echo "PR Guard" ;;
         35-runner-selection.sh) echo "Runner Selection" ;;
         36-zsh-sourcing.sh) echo "zsh Sourcing" ;;
+        37-settings-generation.sh) echo "Settings Generation" ;;
         *) echo "$1" ;;
     esac
 }

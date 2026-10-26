@@ -47,6 +47,8 @@ _adapter_generate_settings() {
         _esc_lint=$(_sed_escape_replacement "${CC_LINT_COMMAND:-echo no-lint}")
         _esc_test=$(_sed_escape_replacement "${CC_TEST_COMMAND:-echo no-tests}")
         _esc_teams=$(_sed_escape_replacement "${CC_AGENT_TEAMS:-false}")
+        local rendered
+        rendered=$(mktemp "${TMPDIR:-/tmp}/cc-settings.XXXXXX")
         sed \
             -e "s|{{CC_PROJECT_NAME}}|${_esc_name}|g" \
             -e "s|{{CC_LANGUAGE}}|${_esc_lang}|g" \
@@ -55,8 +57,27 @@ _adapter_generate_settings() {
             -e "s|{{CC_LINT_COMMAND}}|${_esc_lint}|g" \
             -e "s|{{CC_TEST_COMMAND}}|${_esc_test}|g" \
             -e "s|{{CC_AGENT_TEAMS}}|${_esc_teams}|g" \
-            "${SCRIPT_DIR}/core/templates/settings.json.tmpl" > "$settings_file"
-        info "Generated settings.json from template."
+            "${SCRIPT_DIR}/core/templates/settings.json.tmpl" > "$rendered"
+
+        # Wire only selected and installed hooks, honour CC_SECURITY_LEVEL,
+        # merge into an existing settings.json (#345)
+        if ! command -v python3 &>/dev/null; then
+            rm -f "$rendered"
+            err "python3 is required to generate settings.json (hook selection, merge)"
+            return 1
+        fi
+        local framework_hooks="" f
+        for f in "${SCRIPT_DIR}"/core/hooks/*.sh; do
+            framework_hooks="${framework_hooks} $(basename "$f" .sh)"
+        done
+        if ! python3 "${SCRIPT_DIR}/adapters/claude/settings-render.py" "$rendered" "$settings_file" \
+            "${CC_INSTALL_DIR}/hooks" "${CC_HOOKS:-}" "${CC_SECURITY_LEVEL:-standard}" "$framework_hooks"; then
+            rm -f "$rendered"
+            err "settings.json not generated"
+            return 1
+        fi
+        rm -f "$rendered"
+        info "Generated settings.json from template (hooks: CC_HOOKS, security: ${CC_SECURITY_LEVEL:-standard})."
     else
         cat > "$settings_file" << SETEOF
 {
@@ -212,6 +233,12 @@ _adapter_install_dir_structure() {
 
 _adapter_post_install() {
     local project_dir="$1"
+
+    # Claude Code has hooks natively; the MCP server is opt-in (#345)
+    if [ "${CC_MCP_SERVER:-false}" != "true" ]; then
+        info "MCP server not installed (CC_MCP_SERVER=${CC_MCP_SERVER:-false})."
+        return 0
+    fi
 
     # Install shared MCP server if available
     if _adapter_install_mcp_server "${project_dir}/.cognitive-core/mcp-server"; then
