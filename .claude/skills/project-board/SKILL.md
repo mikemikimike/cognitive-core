@@ -1060,10 +1060,17 @@ Implement GitHub issue #<N>: <TITLE>
 After generating the prompt in Step 7, run the deterministic prompt linter:
 
 ```bash
-_vp_script=$(find . -path "*/project-board/validate-prompt.sh" -type f 2>/dev/null | head -1)
+_pb_root=$(unset GIT_DIR GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null || pwd -P)
+_vp_script=""
+for _candidate in "$_pb_root/.claude/skills/project-board/validate-prompt.sh" "$_pb_root/.cognitive-core/skills/project-board/validate-prompt.sh" "$_pb_root/core/skills/project-board/validate-prompt.sh"; do
+  if [ -f "$_candidate" ]; then _vp_script="$_candidate"; break; fi
+done
 if [ -n "$_vp_script" ]; then
-  echo "$GENERATED_PROMPT" | timeout 5 bash "$_vp_script"
+  _lint_output=$(echo "$GENERATED_PROMPT" | bash "$_vp_script" 2>&1) || _lint_output="NOT RUN (linter failed)"
+else
+  _lint_output="NOT RUN (linter not installed)"
 fi
+printf '%s\n' "$_lint_output"
 ```
 
 The linter checks for stochastic vulnerability patterns: hedging language, politeness tokens, vague terms, escape clauses, open-ended lists, temporal vagueness, ambiguous quantifiers, and structural issues (missing sections, word count, constraint positioning). Advisory only — warnings do not block prompt generation. See #163 for the full pattern table.
@@ -1191,6 +1198,8 @@ Mode:       <technical|business>
 Readiness:  <HIGH/MEDIUM/LOW>
 Complexity: <S/M/L> (<criteria_count> criteria, <file_count> files)
 Techniques: $TECHNIQUES"
+METADATA_BLOCK="$METADATA_BLOCK
+Lint:       $(printf '%s' "$_lint_output" | tail -1)"
 ```
 
 **Provider-specific formatting**:

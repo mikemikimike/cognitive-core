@@ -12,6 +12,19 @@
 # into subprocess commands. Only line numbers and category labels are emitted.
 set -euo pipefail
 
+if [ "${_VP_TIMEOUT_ACTIVE:-0}" != "1" ]; then
+    _vp_timeout=""
+    if command -v timeout >/dev/null 2>&1; then
+        _vp_timeout=$(command -v timeout)
+    elif command -v gtimeout >/dev/null 2>&1; then
+        _vp_timeout=$(command -v gtimeout)
+    fi
+    if [ -n "$_vp_timeout" ]; then
+        export _VP_TIMEOUT_ACTIVE=1
+        exec "$_vp_timeout" 5 "$0" "$@"
+    fi
+fi
+
 # Helper: count grep matches safely (returns 0 on no match, no pipefail crash)
 _grep_count() {
     local pattern="$1"
@@ -187,12 +200,18 @@ fi
 
 _GROUNDING_MSG=""
 
-if [ -z "${CC_PROJECT_DIR:-}" ]; then
-    _GROUNDING_MSG="Grounding: skipped (no project root)"
+if [ -n "${CC_PROJECT_DIR:-}" ]; then
+    _L2_ROOT="$CC_PROJECT_DIR"
+elif _git_root=$(unset GIT_DIR GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null); then
+    _L2_ROOT="$_git_root"
 else
+    _GROUNDING_MSG="Grounding: skipped (no project root)"
+fi
+
+if [ -n "${_L2_ROOT:-}" ] && [ -z "$_GROUNDING_MSG" ]; then
     # Constraint A: validate root is absolute, capture for this invocation
-    case "$CC_PROJECT_DIR" in
-        /*) _L2_ROOT=$(cd "$CC_PROJECT_DIR" 2>/dev/null && pwd -P) || _L2_ROOT="$CC_PROJECT_DIR" ;;
+    case "$_L2_ROOT" in
+        /*) _L2_ROOT=$(cd "$_L2_ROOT" 2>/dev/null && pwd -P) || _L2_ROOT="$_L2_ROOT" ;;
         *)  _GROUNDING_MSG="Grounding: skipped (non-absolute root)" ;;
     esac
 fi
@@ -215,7 +234,8 @@ if [ -z "$_GROUNDING_MSG" ]; then
     _L2_RESOLVED=0
     _L2_EVALUATED=0
 
-    for _term in "${_L2_REFS[@]}"; do
+    if [ "${#_L2_REFS[@]}" -gt 0 ]; then
+      for _term in "${_L2_REFS[@]}"; do
         # Constraint D: cap at 20 evaluated terms
         [ "$_L2_EVALUATED" -ge 20 ] && break
 
@@ -243,9 +263,13 @@ if [ -z "$_GROUNDING_MSG" ]; then
             @*)
                 # Agent handle: strip @ and check filesystem
                 _agent_name="${_term#@}"
-                if [ -f "${_L2_ROOT}/core/agents/${_agent_name}.md" ]; then
-                    _L2_RESOLVED=$((_L2_RESOLVED + 1))
-                fi
+                for _agent_dir in "${_L2_ROOT}/.claude/agents" "${_L2_ROOT}/.cognitive-core/agents" "${_L2_ROOT}/core/agents"; do
+                    _agent_file="${_agent_dir}/${_agent_name}.md"
+                    if [ -f "$_agent_file" ] && [ ! -L "$_agent_file" ]; then
+                        _L2_RESOLVED=$((_L2_RESOLVED + 1))
+                        break
+                    fi
+                done
                 ;;
             *)
                 # File path: test -e with Constraint H symlink check
@@ -271,7 +295,8 @@ if [ -z "$_GROUNDING_MSG" ]; then
                 fi
                 ;;
         esac
-    done
+      done
+    fi
 
     _GROUNDING_MSG="Grounding: ${_L2_RESOLVED}/${_L2_TOTAL} references resolved"
 fi
