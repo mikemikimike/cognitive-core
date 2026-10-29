@@ -324,9 +324,16 @@ touch "${L2_FIXTURE}/core/hooks/validate-bash.sh"
 touch "${L2_FIXTURE}/core/agents/code-standards-reviewer.md"
 touch "${L2_FIXTURE}/core/agents/security-analyst.md"
 
-# L2-1: CC_PROJECT_DIR unset -> grounding skipped
-output=$(echo "<scope>Fix core/auth/handler.sh</scope><constraints>Do NOT skip</constraints>" | bash "$VP_SCRIPT" 2>/dev/null) || true
-assert_contains "L2: skipped when CC_PROJECT_DIR unset" "$output" "Grounding: skipped"
+# L2-1: no explicit root and no Git repository -> grounding skipped
+output=$(cd "$L2_FIXTURE" && echo "<scope>Fix core/auth/handler.sh</scope><constraints>Do NOT skip</constraints>" | env -u CC_PROJECT_DIR bash "$VP_SCRIPT" 2>/dev/null) || true
+assert_contains "L2: skipped without a project root" "$output" "Grounding: skipped"
+git -C "$L2_FIXTURE" init -q
+mkdir -p "$L2_FIXTURE/subdir" "$L2_FIXTURE/.claude/agents"
+touch "$L2_FIXTURE/.claude/agents/installed-agent.md"
+output=$(cd "$L2_FIXTURE/subdir" && echo "<scope>Fix core/auth/handler.sh with @installed-agent</scope><constraints>Do NOT skip</constraints>" | env -u CC_PROJECT_DIR bash "$VP_SCRIPT" 2>/dev/null) || true
+assert_contains "L2: Git root and installed agent from subdirectory" "$output" "2/2 references resolved"
+output=$(cd "$L2_FIXTURE/subdir" && echo "<scope>Implement the fix</scope><constraints>Do NOT skip</constraints>" | env -u CC_PROJECT_DIR bash "$VP_SCRIPT" 2>/dev/null) || true
+assert_contains "L2: no references with Git root" "$output" "0/0 references resolved"
 
 # L2-2: CC_PROJECT_DIR set -> grounding runs
 output=$(echo "<scope>Fix core/auth/handler.sh</scope><constraints>Do NOT skip</constraints>" | CC_PROJECT_DIR="$L2_FIXTURE" bash "$VP_SCRIPT" 2>/dev/null) || true
